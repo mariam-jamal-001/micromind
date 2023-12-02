@@ -24,6 +24,7 @@ from timm.loss import (
 )
 
 import micromind as mm
+from typing import Optional, Tuple
 from micromind.networks import PhiNet, XiNet
 from micromind.utils import parse_configuration
 import sys
@@ -177,18 +178,40 @@ def top_k_accuracy(k=1):
     return acc
 
 
-if __name__ == "__main__":
-    assert len(sys.argv) > 1, "Please pass the configuration file to the script."
+def run_one_experiment(hpo: Optional[Tuple] = None):
+    """This runs a training for a specific configuration.
+    It is wrapped in this function for compatibility with HPO pipelines.
+
+    Arguments
+    ---------
+    hpo : Optional[Tuple]
+        Passed only when this serves as evaluation function for HPO, ignored
+        otherwise.
+
+    Returns
+    -------
+    Objective function for HPO. : float
+    """
     hparams = parse_configuration(sys.argv[1])
+
+    if hpo is not None:
+        # HPO is running
+        print("HPO proposed the following configuration: ")
+        print(hpo)
+        for conf in hpo:
+            # loops through all suggested parameters
+            setattr(hparams, conf, hpo[conf])
+
+        exp_configuration = '_'.join([f"{a}_{hpo[a]:.2f}" for a in hpo])
 
     train_loader, val_loader = create_loaders(hparams)
 
     exp_folder = mm.utils.checkpointer.create_experiment_folder(
-        hparams.output_folder, hparams.experiment_name
+        hparams.output_folder, hparams.experiment_name + "+" + exp_configuration
     )
 
     checkpointer = mm.utils.checkpointer.Checkpointer(
-        exp_folder, hparams=hparams, key="loss"
+        exp_folder, hparams=hparams if hpo is None else None, key="loss"
     )
 
     mind = ImageClassification(hparams=hparams)
@@ -201,7 +224,26 @@ if __name__ == "__main__":
         datasets={"train": train_loader, "val": val_loader},
         metrics=[top5, top1],
         checkpointer=checkpointer,
+        verbose=hpo is None,
         debug=hparams.debug,
     )
 
-    mind.test(datasets={"test": val_loader}, metrics=[top1, top5])
+    test_results = mind.test(datasets={"test": val_loader}, metrics=[top1, top5], verbose=hpo is None)
+
+    return test_results["test_loss"]
+
+
+if __name__ == "__main__":
+    assert len(sys.argv) > 1, "Please pass the configuration file to the script."
+
+    # get experiment configuration
+    hparams = parse_configuration(sys.argv[1])
+
+    if hasattr(hparams, "search_space"):
+        from hyperopt import fmin, tpe
+        best = fmin(fn=run_one_experiment, space=hparams.search_space, algo=tpe.suggest, max_evals=1)
+
+    else:
+        # wrapped in here for HPO
+        run_one_experiment()
+
