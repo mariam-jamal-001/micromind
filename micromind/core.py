@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple, Union
 from accelerate import DistributedDataParallelKwargs
+from torchinfo import summary
 
 import torch
 from accelerate import Accelerator
@@ -18,6 +19,7 @@ from tqdm import tqdm
 import warnings
 
 from .utils.helpers import get_logger
+from .utils.checkpointer import Checkpointer
 
 logger = get_logger()
 
@@ -228,15 +230,12 @@ class MicroMind(ABC):
             try:
                 self.modules[k].load_state_dict(dat[k])
             except Exception as e:  # maybe saved with DDP
-                print(
-                    " ".join(
-                        f"Problem loading checkpoint... \
-                      maybe trained with DDP... \
-                      {type(e).__name__}".split(
-                            " "
-                        )
-                    )
-                )
+                tmp = f""" There was a problem loading the checkpoint...
+                    Maybe trained with DDP... trying to load it anyways.
+                    Errow was {type(e).__name__}.
+                    """
+                warnings.warn(" ".join(tmp.split()))
+
                 self.modules[k] = torch.nn.DataParallel(self.modules[k])
                 self.modules[k].load_state_dict(dat[k])
                 self.modules[k] = self.modules[k].module
@@ -313,6 +312,61 @@ class MicroMind(ABC):
     def __call__(self, *x, **xv):
         """Just forwards everything to the forward method."""
         return self.forward(*x, **xv)
+
+    def add_forward_to_modules(self):
+        """Exports MicroMind forward function to its core ModuleList."""
+        bound_method = self.forward.__get__(self.modules, self.modules.__class__)
+        setattr(self.modules, "forward", bound_method)
+        self.modules.device = self.device
+
+    @torch.no_grad()
+    def compute_params(self):
+        """Computes the number of parameters for the modules inside `self.modules`.
+        Returns a dictionary with the parameter count for each module.
+
+        Returns
+        -------
+        Parameter count for self.modules. : Dict[int]
+        """
+        self.eval()
+        params = {}
+        for k, m in self.modules.items():
+            params[k] = summary(m, verbose=0).total_params
+
+        return params
+
+    @torch.no_grad()
+    def compute_macs(self, input_shape: Union[List, Tuple]):
+        """Computes the number of multiply-add for the modules inside `self.modules`.
+        Returns a dictionary with the MAC count for each module.
+
+        Arguments
+        ---------
+        input_shape : Union[List, Tuple]
+            Needed for MAC computation.
+
+        Returns
+        -------
+        MAC count for self.modules. : Dict[int]
+        """
+        self.eval()
+
+        try:
+            macs = {}
+            last_in = torch.zeros([1] + list(input_shape))
+            for k, m in self.modules.items():
+                macs[k] = summary(m, input_data=last_in, verbose=0).total_mult_adds
+                last_in = m(last_in)
+        except RuntimeError:
+            tmp = """
+            Could not compute the number of MACs of your MicroMind. Might be due
+            to on-the-fly data augmentation or something similar. You can, however,
+            estimate this more accurately after exporting the model.
+            """
+            warnings.warn(" ".join(tmp.split()))
+            macs = None
+
+        return macs
 
     def on_train_start(self):
         """Initializes the optimizer, modules and puts the networks on the right
@@ -394,9 +448,9 @@ class MicroMind(ABC):
         epochs: int = 1,
         datasets: Dict = {},
         metrics: List[Metric] = [],
-        checkpointer=None,  # fix type hints
+        checkpointer: Optional[Checkpointer] = None,
         verbose: Optional[bool] = True,
-        debug: bool = False,
+        debug: Optional[bool] = False,
     ) -> None:
         """
         This method trains the model on the provided training dataset for the
@@ -413,6 +467,11 @@ class MicroMind(ABC):
             "train", "val", and "test".
         metrics : Optional[List[Metric]]
             A list of metrics to track during training. Default is an empty list.
+        checkpointer : Optional[mm.utils.Checkpointer]
+            Checkpointer used to log the experiments and save best checkpoints
+            during training.
+        verbose : Optional[bool]
+            If False, disables the progress bar during validation.
         debug : bool
             Whether to run in debug mode. Default is False. If in debug mode,
             only runs for few epochs
@@ -568,7 +627,12 @@ class MicroMind(ABC):
         return val_metrics
 
     @torch.no_grad()
-    def test(self, datasets: Dict = {}, metrics: List[Metric] = [], verbose: Optional[bool] = True) -> None:
+    def test(
+        self,
+        datasets: Dict = {},
+        metrics: List[Metric] = [],
+        verbose: Optional[bool] = True,
+    ) -> None:
         """Runs the test steps.
 
         Arguments
