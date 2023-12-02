@@ -395,6 +395,7 @@ class MicroMind(ABC):
         datasets: Dict = {},
         metrics: List[Metric] = [],
         checkpointer=None,  # fix type hints
+        verbose: Optional[bool] = True,
         debug: bool = False,
     ) -> None:
         """
@@ -416,7 +417,6 @@ class MicroMind(ABC):
             Whether to run in debug mode. Default is False. If in debug mode,
             only runs for few epochs
             and with few batches.
-
         """
         self.datasets = datasets
         self.metrics = metrics
@@ -440,7 +440,7 @@ class MicroMind(ABC):
                 unit="batches",
                 ascii=True,
                 dynamic_ncols=True,
-                disable=not self.accelerator.is_local_main_process,
+                disable=not (self.accelerator.is_local_main_process and verbose),
             )
             loss_epoch = 0
             pbar.set_description(f"Running epoch {self.current_epoch}/{epochs}")
@@ -493,7 +493,7 @@ class MicroMind(ABC):
             train_metrics.update({"train_loss": loss_epoch / (idx + 1)})
 
             if "val" in datasets:
-                val_metrics = self.validate()
+                val_metrics = self.validate(verbose=verbose)
                 if (
                     self.accelerator.is_local_main_process
                     and self.checkpointer is not None
@@ -513,8 +513,18 @@ class MicroMind(ABC):
         return None
 
     @torch.no_grad()
-    def validate(self) -> Dict:
-        """Runs the validation step."""
+    def validate(self, verbose: Optional[bool] = True) -> Dict:
+        """Runs the validation step.
+
+        Arguments
+        ---------
+        verbose : Optional[bool]
+            If False, disables the progress bar during validation.
+
+        Returns
+        -------
+        Dictionary with validation metrics. : Dict[torch.Tensor]
+        """
         assert "val" in self.datasets, "Validation dataloader was not specified."
         self.modules.eval()
 
@@ -523,7 +533,7 @@ class MicroMind(ABC):
             unit="batches",
             ascii=True,
             dynamic_ncols=True,
-            disable=not self.accelerator.is_local_main_process,
+            disable=not (self.accelerator.is_local_main_process and verbose),
         )
         loss_epoch = 0
         pbar.set_description("Validation...")
@@ -558,7 +568,7 @@ class MicroMind(ABC):
         return val_metrics
 
     @torch.no_grad()
-    def test(self, datasets: Dict = {}, metrics: List[Metric] = []) -> None:
+    def test(self, datasets: Dict = {}, metrics: List[Metric] = [], verbose: Optional[bool] = True) -> None:
         """Runs the test steps.
 
         Arguments
@@ -568,6 +578,8 @@ class MicroMind(ABC):
             `test`.
         metrics : List[Metric]
             List of metrics to compute during test step.
+        verbose : Optional[bool]
+            If False, disables the progress bar during validation.
 
         Returns
         -------
@@ -581,7 +593,7 @@ class MicroMind(ABC):
             unit="batches",
             ascii=True,
             dynamic_ncols=True,
-            disable=not self.accelerator.is_local_main_process,
+            disable=not (self.accelerator.is_local_main_process and verbose),
         )
         loss_epoch = 0
         pbar.set_description("Testing...")
