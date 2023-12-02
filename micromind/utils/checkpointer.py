@@ -97,11 +97,12 @@ class Checkpointer:
             with open(os.path.join(self.root_dir, "args.yaml"), "w") as args_f:
                 args_f.write(yaml.safe_dump(vars(hparams)))
         else:
-            warnings.warn(
-                "You did not specify the configuration to the checkpointer, \
-                so it won't be saved. You can pass one using the hparams \
+            tmp = """
+                "You did not specify the configuration to the checkpointer,
+                so it won't be saved. You can pass one using the hparams
                 argument. Ignore this if you are in debug mode."
-            )
+            """
+            warnings.warn(" ".join(tmp.split()))
 
         # if true, does not write on disk
         self.debug = False
