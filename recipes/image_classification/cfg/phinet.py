@@ -5,6 +5,11 @@ Authors:
     - Francesco Paissan, 2023
 """
 
+# first of all, set seed!
+from micromind.utils.helpers import seed_everything
+
+seed_everything(1729)
+
 # Model configuration
 model = "phinet"
 input_shape = (3, 32, 32)

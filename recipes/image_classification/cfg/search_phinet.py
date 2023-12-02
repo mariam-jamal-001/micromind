@@ -6,15 +6,24 @@ Authors:
 """
 
 # Model search for checkpoint extraction
-try:    # check if user installed hyperopt
+try:  # check if user installed hyperopt
     from hyperopt import hp
     from hyperopt.pyll import scope
 except ImportError:
     print(
-        ' '.join("HyperOpt does not seem to be installed. \
-        You can install it with pip install hyperopt".split(" "))
+        " ".join(
+            "HyperOpt does not seem to be installed. \
+        You can install it with pip install hyperopt".split(
+                " "
+            )
+        )
     )
     exit(0)
+
+# first of all, set seed!
+from micromind.utils.helpers import seed_everything
+
+seed_everything(1729)
 
 model = "phinet"
 input_shape = (3, 32, 32)
@@ -25,14 +34,10 @@ return_layers = None
 
 
 # compute budgets and search space
-alpha = hp.uniform('alpha', 0.3, 3)
-beta = hp.uniform('beta', 0.5, 1)
-t_zero = scope.int(hp.quniform('t_zero', 3, 6, q=1))
-search_space = {
-    "alpha": alpha,
-    "beta": beta,
-    "t_zero": t_zero
-}
+alpha = hp.uniform("alpha", 0.3, 3)
+beta = hp.uniform("beta", 0.5, 1)
+t_zero = scope.int(hp.quniform("t_zero", 3, 6, q=1))
+search_space = {"alpha": alpha, "beta": beta, "t_zero": t_zero}
 
 MAX_PARAMS = 2e6
 

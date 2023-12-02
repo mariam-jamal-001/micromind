@@ -14,6 +14,22 @@ import micromind as mm
 import argparse
 
 
+def seed_everything(seed: int):
+    """Seed everything function. Sets seed for python, random, numpy
+    and torch."""
+    import os
+    import random
+    import numpy as np
+    import torch
+
+    random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+
+
 def override_conf(hparams: Dict):
     """Handles command line overrides. Takes as input a configuration
     and defines all the keys as arguments. If passed from command line,
