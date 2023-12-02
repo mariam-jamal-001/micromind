@@ -192,6 +192,7 @@ def run_one_experiment(hpo: Optional[Tuple] = None):
     """
     hparams = parse_configuration(sys.argv[1])
 
+    exp_configuration = ""
     if hpo is not None:
         # HPO is running
         print("HPO proposed the following configuration: ")
@@ -213,6 +214,12 @@ def run_one_experiment(hpo: Optional[Tuple] = None):
     )
 
     mind = ImageClassification(hparams=hparams)
+
+    # validate complexity of configuration
+    if sum(mind.compute_params().values()) > getattr(hparams, "MAX_PARAMS", 1e15):
+        # requested configuration yields really big network
+        # return high value so it's not selected
+        return float(1e9)
 
     top1 = mm.Metric("top1_acc", top_k_accuracy(k=1), eval_only=True)
     top5 = mm.Metric("top5_acc", top_k_accuracy(k=5), eval_only=True)
@@ -240,8 +247,9 @@ if __name__ == "__main__":
     hparams = parse_configuration(sys.argv[1])
 
     if hasattr(hparams, "search_space"):
-        from hyperopt import fmin, tpe
+        from hyperopt import fmin, tpe, Trials
 
+        trials = Trials()
         best = fmin(
             fn=run_one_experiment,
             space=hparams.search_space,
