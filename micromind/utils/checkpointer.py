@@ -60,6 +60,10 @@ class Checkpointer:
     mode: Optional[str]
         Either `min` or `max`. If min, will store the checkpoint with the lowest
         value for key. If max, it does the opposite.
+    hparams : Optional[Namespace]
+        Configuration of the experiment, when passed is dumped in a YAML.
+    verbose : Optional[bool]
+        When False, disables console logging from checkpointer.
 
     Example
     -------
@@ -77,6 +81,7 @@ class Checkpointer:
         key: Optional[str] = "loss",
         mode: Optional[str] = "min",
         hparams: Optional[Namespace] = None,
+        verbose: Optional[bool] = True,
     ) -> None:
         assert experiment_folder != "", "You should pass a valid experiment folder."
         assert os.path.exists(
@@ -85,6 +90,7 @@ class Checkpointer:
         assert mode in ["max", "min"], "Checkpointer mode can be only max or min."
         self.key = "val_" + key
         self.mode = mode
+        self.verbose = verbose
 
         self.bests = torch.inf if mode == "min" else -torch.inf
         self.check_paths = ""
@@ -102,7 +108,8 @@ class Checkpointer:
                 so it won't be saved. You can pass one using the hparams
                 argument. Ignore this if you are in debug mode."
             """
-            warnings.warn(" ".join(tmp.split()))
+            if self.verbose:
+                warnings.warn(" ".join(tmp.split()))
 
         # if true, does not write on disk
         self.debug = False
@@ -137,20 +144,22 @@ class Checkpointer:
                 self.key = dat["metric_key"]
 
                 accelerate_path = os.path.join(oldest_name, "accelerate_dump")
-                logger.info(
-                    f"Recovered info from checkpoint {oldest_name} at epoch {epoch}."
-                )
-                logger.info(f"{self.key} was {self.bests:.4f} for this checkpoint.")
+                if self.verbose:
+                    logger.info(
+                        f"Recovered from checkpoint {oldest_name} at epoch {epoch}."
+                    )
+                    logger.info(f"{self.key} was {self.bests:.4f} for this checkpoint.")
 
                 return accelerate_path, epoch
             except Exception as e:
-                logger.info(
-                    " ".join(
-                        f"Tried to recover checkpoint {oldest_name}, \
-                    but it appears corrupted.".split()
+                if self.verbose:
+                    logger.info(
+                        " ".join(
+                            f"Tried to recover checkpoint {oldest_name}, \
+                        but it appears corrupted.".split()
+                        )
                     )
-                )
-                logger.debug(str(e))
+                    logger.debug(str(e))
         return
 
     @staticmethod
@@ -207,7 +216,8 @@ class Checkpointer:
         s_out += " - ".join([f"{k2}: {v2:.4f}" for k2, v2 in metrics.items()]) + ".\n"
         if not self.debug:
             self.fstream.write(s_out)
-        logger.info(s_out)
+        if self.verbose:
+            logger.info(s_out)
 
         if not self.debug:
             mind.accelerator.save_state(os.path.join(current_folder, "accelerate_dump"))
@@ -238,9 +248,11 @@ class Checkpointer:
 
                 self.bests = metrics[self.key]
                 self.check_paths = current_folder
-                logger.info(
-                    f"Generated better checkpoint at epoch {mind.current_epoch}."
-                )
+
+                if self.verbose:
+                    logger.info(
+                        f"Generated better checkpoint at epoch {mind.current_epoch}."
+                    )
 
         elif self.mode == "max":
             if metrics[self.key] >= self.bests:
@@ -255,12 +267,15 @@ class Checkpointer:
 
                 self.bests = metrics[self.key]
                 self.check_paths = current_folder
-                logger.info(
-                    f"Generated better checkpoint at epoch {mind.current_epoch}."
-                )
+                if self.verbose:
+                    logger.info(
+                        f"Generated better checkpoint at epoch {mind.current_epoch}."
+                    )
 
         if to_remove is not None and to_remove != "" and not self.debug:
-            logger.info(f"Deleting {to_remove}.")
+            if self.verbose:
+                logger.info(f"Deleting {to_remove}.")
+
             if os.path.exists(to_remove):
                 shutil.rmtree(to_remove)
 

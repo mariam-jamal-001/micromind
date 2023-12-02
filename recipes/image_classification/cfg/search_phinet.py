@@ -39,13 +39,14 @@ beta = hp.uniform("beta", 0.5, 1)
 t_zero = scope.int(hp.quniform("t_zero", 3, 6, q=1))
 search_space = {"alpha": alpha, "beta": beta, "t_zero": t_zero}
 
-MAX_PARAMS = 2e6
+MAX_PARAMS = 0.5e6
 
 # For inference
 ckpt_pretrained = ""
 
 # Basic training loop
-epochs = 2
+epochs = 20
+hpo_trials = 200
 
 # Basic data
 data_dir = "data/cifar10/"

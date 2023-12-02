@@ -23,10 +23,13 @@ from timm.loss import (
 )
 
 import micromind as mm
-from typing import Optional, Tuple
+from typing import Tuple, List
 from micromind.networks import PhiNet, XiNet
 from micromind.utils import parse_configuration
+from argparse import Namespace
+from functools import partial
 import sys
+import os
 
 
 class ImageClassification(mm.MicroMind):
@@ -65,11 +68,10 @@ class ImageClassification(mm.MicroMind):
 
         self.mixup_fn, _ = setup_mixup(hparams)
 
-        print("Number of parameters for each module:")
-        print(self.compute_params())
-
-        print("Number of MAC for each module:")
-        print(self.compute_macs(hparams.input_shape))
+        print(f"Number of parameters for each module: {self.compute_params()}")
+        print(
+            f"Number of MAC for each module: {self.compute_macs(hparams.input_shape)}"
+        )
 
     def setup_criterion(self):
         """Setup of the loss function based on augmentation strategy."""
@@ -176,7 +178,7 @@ def top_k_accuracy(k=1):
     return acc
 
 
-def run_one_experiment(hpo: Optional[Tuple] = None):
+def run_one_experiment(hpo: Tuple, hparams: Namespace, loaders: List):
     """This runs a training for a specific configuration.
     It is wrapped in this function for compatibility with HPO pipelines.
 
@@ -190,8 +192,6 @@ def run_one_experiment(hpo: Optional[Tuple] = None):
     -------
     Objective function for HPO. : float
     """
-    hparams = parse_configuration(sys.argv[1])
-
     exp_configuration = ""
     if hpo is not None:
         # HPO is running
@@ -203,14 +203,15 @@ def run_one_experiment(hpo: Optional[Tuple] = None):
 
         exp_configuration = "_".join([f"{a}_{hpo[a]:.2f}" for a in hpo])
 
-    train_loader, val_loader = create_loaders(hparams)
-
     exp_folder = mm.utils.checkpointer.create_experiment_folder(
         hparams.output_folder, hparams.experiment_name + "+" + exp_configuration
     )
 
     checkpointer = mm.utils.checkpointer.Checkpointer(
-        exp_folder, hparams=hparams if hpo is None else None, key="loss"
+        exp_folder,
+        hparams=hparams if hpo is None else None,
+        key="loss",
+        verbose=hpo is None,
     )
 
     mind = ImageClassification(hparams=hparams)
@@ -226,7 +227,7 @@ def run_one_experiment(hpo: Optional[Tuple] = None):
 
     mind.train(
         epochs=hparams.epochs,
-        datasets={"train": train_loader, "val": val_loader},
+        datasets={"train": loaders[0], "val": loaders[1]},
         metrics=[top5, top1],
         checkpointer=checkpointer,
         verbose=hpo is None,
@@ -234,7 +235,7 @@ def run_one_experiment(hpo: Optional[Tuple] = None):
     )
 
     test_results = mind.test(
-        datasets={"test": val_loader}, metrics=[top1, top5], verbose=hpo is None
+        datasets={"test": loaders[1]}, metrics=[top1, top5], verbose=hpo is None
     )
 
     return test_results["test_loss"]
@@ -246,17 +247,29 @@ if __name__ == "__main__":
     # get experiment configuration
     hparams = parse_configuration(sys.argv[1])
 
+    loaders = create_loaders(hparams)
+
     if hasattr(hparams, "search_space"):
         from hyperopt import fmin, tpe, Trials
 
         trials = Trials()
+        obj = partial(run_one_experiment, hparams=hparams, loaders=loaders)
         best = fmin(
-            fn=run_one_experiment,
+            fn=obj,
             space=hparams.search_space,
             algo=tpe.suggest,
-            max_evals=1,
+            trials=trials,
+            max_evals=hparams.hpo_trials,
+        )
+
+        import pandas as pd
+
+        trials_df = pd.DataFrame([pd.Series(t["misc"]["vals"]) for t in trials])
+        trials_df["loss"] = [t["result"]["loss"] for t in trials]
+        trials_df.to_csv(
+            os.path.join(hparams.output_folder, f"{hparams.experiment_name}.csv")
         )
 
     else:
         # wrapped in here for HPO
-        run_one_experiment()
+        run_one_experiment(None, hparams, loaders)
