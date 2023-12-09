@@ -70,7 +70,7 @@ def create_loaders(args: Namespace):
     dataset_train = create_dataset(
         args.dataset,
         root=args.data_dir,
-        # split=args.train_split,
+        split=args.train_split,
         is_training=True,
         class_map=args.class_map,
         download=args.dataset_download,
@@ -165,5 +165,7 @@ def create_loaders(args: Namespace):
         loader_train = loader_class(dataset_train, **loader_args)
         loader_args["drop_last"] = False
         loader_eval = loader_class(dataset_eval, **loader_args)
+
+    breakpoint()
 
     return loader_train, loader_eval
