@@ -166,6 +166,4 @@ def create_loaders(args: Namespace):
         loader_args["drop_last"] = False
         loader_eval = loader_class(dataset_eval, **loader_args)
 
-    breakpoint()
-
     return loader_train, loader_eval
