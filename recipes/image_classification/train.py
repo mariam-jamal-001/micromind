@@ -37,19 +37,18 @@ class ImageClassification(mm.MicroMind):
 
         if hparams.model == "phinet":
             self.modules["classifier"] = PhiNet(
-                input_shape=hparams.input_shape,
-                alpha=hparams.alpha,
-                num_layers=hparams.num_layers,
-                beta=hparams.beta,
-                t_zero=hparams.t_zero,
-                compatibility=False,
-                divisor=hparams.divisor,
-                downsampling_layers=hparams.downsampling_layers,
-                return_layers=hparams.return_layers,
-                # classification-specific
-                include_top=True,
-                num_classes=hparams.num_classes,
-            )
+                    (3, 128, 128),
+                    alpha=1.1,
+                    beta=0.75,
+                    t_zero=5,
+                    num_layers=8,
+                    h_swish=False,
+                    squeeze_excite=True,
+                    include_top=True,
+                    num_classes=50,
+                    divisor=8,
+                    compatibility=False
+                    )
         elif hparams.model == "xinet":
             self.modules["classifier"] = XiNet(
                 input_shape=hparams.input_shape,

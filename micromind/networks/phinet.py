@@ -207,7 +207,8 @@ class SEBlock(torch.nn.Module):
         x = self.se_conv(x)
         x = self.activation(x)
         x = self.se_conv2(x)
-        x = torch.sigmoid(x)
+        # x = torch.sigmoid(x)
+        x = torch.clamp(x, 0, 1) # hard sigmoid
 
         return self.mult.mul(inp, x)  # Equivalent to ``torch.mul(a, b)``
 
