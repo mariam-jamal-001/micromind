@@ -14,6 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from micromind.utils.yolo import autopad, dist2bbox, make_anchors
+from .xinet import XiConv
 
 
 class Upsample:
@@ -455,6 +456,69 @@ class Yolov8Neck(nn.Module):
         return return_heads
 
 
+class Yolov8NeckOpt(Yolov8Neck):
+    def __init__(
+        self, filters=[256, 512, 768], up=[2, 2], heads=[True, True, True], d=1
+    ):
+        super().__init__()
+        self.heads = heads
+        self.up1 = Upsample(up[0], mode="nearest")
+        self.up2 = Upsample(up[1], mode="nearest")
+        self.n1 = XiConv(
+            c_in=int(filters[1] + filters[2]),
+            c_out=int(filters[1]),
+            kernel_size=3,
+            gamma=3,
+            skip_tensor_in=False,
+        )
+        self.n2 = XiConv(
+            int(filters[0] + filters[1]),
+            int(filters[0]),
+            kernel_size=3,
+            gamma=3,
+            skip_tensor_in=False,
+        )
+        """
+        Only if we decide to use the 2nd and 3rd detection head we define
+        the needed blocks. Otherwise the not needed blocks would be initialized
+        (and thus would occupy space) but will never be used.
+        """
+        if self.heads[1] or self.heads[2]:
+            self.n3 = XiConv(
+                int(filters[0]),
+                int(filters[0]),
+                kernel_size=3,
+                gamma=3,
+                stride=2,
+                padding=1,
+                skip_tensor_in=False,
+            )
+            self.n4 = XiConv(
+                int(filters[0] + filters[1]),
+                int(filters[1]),
+                kernel_size=3,
+                gamma=3,
+                skip_tensor_in=False,
+            )
+        if self.heads[2]:
+            self.n5 = XiConv(
+                int(filters[1]),
+                int(filters[1]),
+                gamma=3,
+                kernel_size=3,
+                stride=2,
+                padding=1,
+                skip_tensor_in=False,
+            )
+            self.n6 = XiConv(
+                int(filters[1] + filters[2]),
+                int(filters[2]),
+                gamma=3,
+                kernel_size=3,
+                skip_tensor_in=False,
+            )
+
+
 class DetectionHead(nn.Module):
     """Implements YOLOv8's detection head.
 
@@ -554,7 +618,9 @@ class YOLOv8(nn.Module):
     def __init__(self, w, r, d, num_classes=80):
         super().__init__()
         self.net = Darknet(w, r, d)
-        self.fpn = Yolov8Neck(w, r, d)
+        self.fpn = Yolov8Neck(
+            filters=[int(256 * w), int(512 * w), int(512 * w * r)], d=d
+        )
         self.head = DetectionHead(
             num_classes, filters=(int(256 * w), int(512 * w), int(512 * w * r))
         )
