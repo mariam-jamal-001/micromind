@@ -139,3 +139,4 @@ build_dgx.sh
 run_dgx.sh
 
 data/
+wandb/

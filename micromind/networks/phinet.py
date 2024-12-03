@@ -568,7 +568,7 @@ class PhiNet(nn.Module):
             {'MAC': 9817670, 'params': 30917}
         """
         temp = summary(
-            self, input_data=torch.zeros([1] + list(self.input_shape)), verbose=0
+            self, input_data=torch.zeros([1] + list(self.input_shape)), verbose=0, device=0
         )
 
         return {"MAC": temp.total_mult_adds, "params": temp.total_params}
