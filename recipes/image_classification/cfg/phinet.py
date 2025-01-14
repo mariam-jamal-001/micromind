@@ -20,6 +20,7 @@ t_zero = 5
 divisor = 8
 downsampling_layers = [5, 7]
 return_layers = None
+h_swish = True
 
 ckpt_pretrained = ""
 

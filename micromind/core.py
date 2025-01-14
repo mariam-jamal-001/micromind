@@ -377,6 +377,7 @@ class MicroMind(ABC):
 
         # pass debug status to checkpointer
         self.checkpointer.debug = self.hparams.debug
+        #self.checkpointer.debug = False
 
         init_opt = self.configure_optimizers()
         if isinstance(init_opt, list) or isinstance(init_opt, tuple):

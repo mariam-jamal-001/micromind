@@ -15,7 +15,7 @@ Authors:
 
 import torch
 import torch.nn as nn
-from prepare_data import create_loaders, setup_mixup
+from .prepare_data import create_loaders, setup_mixup
 from timm.loss import (
     BinaryCrossEntropy,
     LabelSmoothingCrossEntropy,
@@ -53,6 +53,7 @@ class ImageClassification(mm.MicroMind):
                 # classification-specific
                 include_top=True,
                 num_classes=hparams.num_classes,
+                h_swish=hparams.h_swish
             )
         elif hparams.model == "xinet":
             self.modules["classifier"] = XiNet(

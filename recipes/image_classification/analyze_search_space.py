@@ -27,6 +27,27 @@ def define_search_space(trial):
     
     return alpha, beta, t_zero, num_layers
 
+def plot_params_histogram(params_vals, bins=50):
+    """
+    Plot a histogram of the distribution of the number of parameters.
+
+    Args:
+        params_vals (numpy.ndarray): Array of number of parameters from the search space.
+        bins (int): Number of bins to use in the histogram.
+    """
+    plt.figure(figsize=(10, 6))
+    plt.hist(params_vals, bins=bins, color='skyblue', edgecolor='black', alpha=0.7)
+    plt.xlabel('Number of Parameters')
+    plt.ylabel('Frequency')
+    plt.title('Distribution of Number of Parameters in the Search Space')
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    
+    # Save and show the histogram
+    plt.savefig("/home/majam001/thesis_mariam/micromind/recipes/image_classification/plots/search_space/phinets_params_histogram.jpg")
+    logger.info("Histogram of number of parameters saved.")
+
+
 # Function to sample from the search space
 def sample_and_compute(num_samples=1000):
     mac_values = []
@@ -204,6 +225,9 @@ def main():
     # Perform the sampling and compute the number of parameters and MACs
     num_samples = 1000
     params_vals, mac_vals, alpha_vals, beta_vals, t_zero_vals, num_layers_vals = sample_and_compute(num_samples)
+
+    # Generate and visualize histogram of number of parameters
+    plot_params_histogram(params_vals)
 
     # Visualize the results
     plot_results(alpha_vals, beta_vals, t_zero_vals, num_layers_vals, params_vals, mac_vals)
