@@ -28,7 +28,7 @@ ckpt_pretrained = ""
 epochs = 50
 
 # Basic data
-data_dir = "data/cifar10/"
+data_dir = "/home/majam001/thesis_mariam/micromind/recipes/image_classification/data/cifar10/"
 dataset = "torch/cifar10"
 batch_size = 256
 dataset_download = True

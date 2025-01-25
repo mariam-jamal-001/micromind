@@ -15,6 +15,7 @@ from micromind.utils import parse_configuration
 from recipes.image_classification.train import ImageClassification
 from micromind.networks.phinet import ReLUMax
 
+
 def network_weight_gaussian_init(net: nn.Module):
     with torch.no_grad():
         for m in net.modules():
@@ -51,6 +52,11 @@ def compute_nas_score(gpu, model, resolution, batch_size):
     # if gpu is not None:
     #     torch.cuda.set_device(gpu)
     #     model = model.cuda(gpu)
+
+    torch.manual_seed(42)
+    np.random.seed(42)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
     network_weight_gaussian_init(model)
     input = torch.randn(size=[batch_size, 3, resolution, resolution])

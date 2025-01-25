@@ -6,6 +6,7 @@ import pandas as pd
 import torch
 import logging
 from micromind.networks import PhiNet
+from dataclasses import dataclass
 
 # Check if CUDA is available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -121,13 +122,12 @@ def sample_and_compute(num_samples=1000):
         torch.cuda.empty_cache()  # Clear any unused memory in the GPU
     
     logger.info("Hyperparameter sampling process completed.")
-    return np.array(params_values), np.array(mac_values), np.array(alpha_values), np.array(beta_values), np.array(t_zero_values), np.array(num_layers_values)
+    return ModelRecipe(np.array(params_values), np.array(mac_values), np.array(alpha_values), np.array(beta_values), np.array(t_zero_values), np.array(num_layers_values))
 
 # Visualize the results
 def plot_results(alpha_vals, beta_vals, t_zero_vals, num_layers_vals, params_vals, mac_vals):
     plt.figure(figsize=(20, 6))
     
-
     # alpha vs num_params
     plt.subplot(2, 4, 1)
     plt.scatter(alpha_vals, params_vals, alpha=0.6)
@@ -216,6 +216,16 @@ def save_results_to_csv_and_wandb(alpha_vals, beta_vals, t_zero_vals, num_layers
     # Optionally, log the summary table to WandB
     wandb.log({"summary_table": wandb.Table(dataframe=results_df)})
     logger.info("Results logged to WandB.")
+
+@dataclass
+class ModelRecipe():
+    params_vals: np.array
+    mac_vals: np.array
+    alpha_vals: np.array
+    beta_vals: np.array
+    t_zero_vals: np.array
+    num_layers_vals: np.array
+    
 
 # Main function
 def main():

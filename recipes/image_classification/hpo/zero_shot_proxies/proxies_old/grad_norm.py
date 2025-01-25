@@ -6,6 +6,7 @@ import numpy as np
 from recipes.image_classification.train import ImageClassification
 from micromind.utils import parse_configuration
 import argparse
+import torch.nn.functional as F
 
 def network_weight_gaussian_init(net: nn.Module):
     with torch.no_grad():
@@ -26,7 +27,6 @@ def network_weight_gaussian_init(net: nn.Module):
 
     return net
 
-import torch.nn.functional as F
 def cross_entropy(logit, target):
     # target must be one-hot format!!
     prob_logit = F.log_softmax(logit, dim=1)
